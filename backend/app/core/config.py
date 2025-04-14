@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = Field(default="deepfake_detection")
     POSTGRES_PORT: int = Field(default=5432)
     SQLALCHEMY_DATABASE_URI: Optional[str] = Field(default=None)
+    DATABASE_TYPE: str = Field(default="postgresql")  # "postgresql" or "sqlite"
     
     # Redis settings
     REDIS_HOST: str = Field(default="redis")
@@ -65,6 +66,8 @@ class Settings(BaseSettings):
     
     # Processing settings
     DEFAULT_CONFIDENCE_THRESHOLD: float = Field(default=0.5)
+
+    
     
     # Parse the BACKEND_CORS_ORIGINS from comma-separated string if needed
     @validator("BACKEND_CORS_ORIGINS", pre=True)
@@ -100,8 +103,12 @@ class Settings(BaseSettings):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Build database URI
-        if not self.SQLALCHEMY_DATABASE_URI:
+        
+        # Set database URI based on type
+        if self.DATABASE_TYPE == "sqlite":
+            self.SQLALCHEMY_DATABASE_URI = "sqlite:///./app.db"
+        else:
+            # Build PostgreSQL URI
             self.SQLALCHEMY_DATABASE_URI = (
                 f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@"
                 f"{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

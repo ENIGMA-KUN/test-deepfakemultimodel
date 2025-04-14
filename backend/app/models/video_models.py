@@ -280,23 +280,32 @@ def get_video_model(model_type=None):
     
     if model_type == "3dcnn":
         model = C3D()
-        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "c3d_deepfake.pth")
+        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "c3d_deepfake.pt")  # Standardized to .pt
     elif model_type == "two-stream":
         model = TwoStreamNetwork()
-        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "two_stream_deepfake.pth")  # This file might not exist
+        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "two_stream_deepfake.pt")  # Standardized to .pt
     elif model_type == "timesformer":
         model = TimeSformer()
-        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "timesformer_deepfake.pyth")  # Changed to .pyth
+        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "timesformer_deepfake.pt")  # Standardized to .pt
     else:
         raise ValueError(f"Unsupported video model type: {model_type}")
     
-    # Load weights if available
+    # Improved error handling for weights
     if os.path.exists(weights_path):
-        logger.info(f"Loading weights from {weights_path}")
-        state_dict = torch.load(weights_path, map_location=device)
-        model.load_state_dict(state_dict)
+        try:
+            logger.info(f"Loading weights from {weights_path}")
+            state_dict = torch.load(weights_path, map_location=device)
+            model.load_state_dict(state_dict)
+            logger.info(f"Successfully loaded weights for {model_type} model")
+        except Exception as e:
+            logger.error(f"Failed to load weights for {model_type} model: {str(e)}")
+            raise RuntimeError(f"Error loading model weights for {model_type}: {str(e)}")
     else:
-        logger.warning(f"Weights file not found at {weights_path}, using model with default initialization")
+        if settings.ENVIRONMENT == "production":
+            raise FileNotFoundError(f"Model weights file not found at {weights_path}")
+        else:
+            logger.warning(f"Weights file not found at {weights_path}, using model with default initialization")
+            logger.warning("This will likely result in poor detection performance")
     
     model = model.to(device)
     model.eval()

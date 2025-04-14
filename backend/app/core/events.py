@@ -75,5 +75,49 @@ def create_stop_app_handler(app: FastAPI) -> Callable:
             logger.info("Resources cleaned up successfully")
         except Exception as e:
             logger.error(f"Error during cleanup: {str(e)}")
+
+def validate_system_dependencies():
+    """
+    Validate that all required system dependencies are available.
+    
+    Raises:
+        RuntimeError: If any required dependency is missing
+    """
+    missing_deps = []
+    
+    # Check for FFmpeg
+    import shutil
+    if shutil.which("ffmpeg") is None:
+        missing_deps.append("FFmpeg (required for audio extraction from videos)")
+    
+    # Check for PyTorch
+    try:
+        import torch
+        logger.info(f"PyTorch version: {torch.__version__}")
+    except ImportError:
+        missing_deps.append("PyTorch")
+    
+    # Check for Transformers
+    try:
+        import transformers
+        logger.info(f"Transformers version: {transformers.__version__}")
+    except ImportError:
+        missing_deps.append("Transformers (required for Wav2Vec2 model)")
+    
+    # Check for librosa
+    try:
+        import librosa
+        logger.info(f"Librosa version: {librosa.__version__}")
+    except ImportError:
+        missing_deps.append("Librosa (required for audio processing)")
+    
+    # Raise error if any dependencies are missing
+    if missing_deps:
+        error_msg = "Missing required dependencies: " + ", ".join(missing_deps)
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
+    
+    logger.info("All system dependencies validated successfully")
+    return True
     
     return stop_app

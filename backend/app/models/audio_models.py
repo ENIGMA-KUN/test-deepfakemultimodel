@@ -85,13 +85,13 @@ class RawNet2(nn.Module):
             nn.LeakyReLU(0.3)
         )
         
-        # Residual blocks
-        self.res_block1 = self._make_res_block(32, 32)
-        self.res_block2 = self._make_res_block(32, 64, stride=2)
-        self.res_block3 = self._make_res_block(64, 64)
-        self.res_block4 = self._make_res_block(64, 128, stride=2)
-        self.res_block5 = self._make_res_block(128, 128)
-        self.res_block6 = self._make_res_block(128, 256, stride=2)
+        # Residual blocks with properly initialized skip connections
+        self.res_block1, self.skip1 = self._make_res_block(32, 32)
+        self.res_block2, self.skip2 = self._make_res_block(32, 64, stride=2)
+        self.res_block3, self.skip3 = self._make_res_block(64, 64)
+        self.res_block4, self.skip4 = self._make_res_block(64, 128, stride=2)
+        self.res_block5, self.skip5 = self._make_res_block(128, 128)
+        self.res_block6, self.skip6 = self._make_res_block(128, 256, stride=2)
         
         # Global pooling and classification
         self.global_pool = nn.AdaptiveAvgPool1d(1)
@@ -100,6 +100,7 @@ class RawNet2(nn.Module):
         self.sigmoid = nn.Sigmoid()
     
     def _make_res_block(self, in_channels, out_channels, stride=1):
+        """Create a residual block with proper skip connection"""
         layers = []
         layers.append(nn.Conv1d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1))
         layers.append(nn.BatchNorm1d(out_channels))
@@ -107,43 +108,65 @@ class RawNet2(nn.Module):
         layers.append(nn.Conv1d(out_channels, out_channels, kernel_size=3, stride=1, padding=1))
         layers.append(nn.BatchNorm1d(out_channels))
         
-        # Skip connection
+        # Define skip connection
+        skip = None
         if stride != 1 or in_channels != out_channels:
-            self.skip = nn.Sequential(
+            skip = nn.Sequential(
                 nn.Conv1d(in_channels, out_channels, kernel_size=1, stride=stride),
                 nn.BatchNorm1d(out_channels)
             )
-        else:
-            self.skip = None
         
         layers.append(nn.LeakyReLU(0.3))
         
-        return nn.Sequential(*layers)
+        return nn.Sequential(*layers), skip
     
     def forward(self, x):
         # Ensure input is [B, 1, T] where B is batch size and T is time samples
         x = self.conv1(x)
         
-        # Apply residual blocks
-        if self.skip is not None:
-            x = self.res_block1(x) + self.skip(x)
+        # Apply residual blocks with proper skip connections
+        identity = x
+        x = self.res_block1(x)
+        if self.skip1 is not None:
+            x = x + self.skip1(identity)
         else:
-            x = self.res_block1(x) + x
+            x = x + identity
         
-        self.skip = None
+        identity = x
         x = self.res_block2(x)
+        if self.skip2 is not None:
+            x = x + self.skip2(identity)
+        else:
+            x = x + identity
         
-        self.skip = None
-        x = self.res_block3(x) + x
+        # Repeat for remaining blocks
+        identity = x
+        x = self.res_block3(x)
+        if self.skip3 is not None:
+            x = x + self.skip3(identity)
+        else:
+            x = x + identity
         
-        self.skip = None
+        identity = x
         x = self.res_block4(x)
+        if self.skip4 is not None:
+            x = x + self.skip4(identity)
+        else:
+            x = x + identity
         
-        self.skip = None
-        x = self.res_block5(x) + x
+        identity = x
+        x = self.res_block5(x)
+        if self.skip5 is not None:
+            x = x + self.skip5(identity)
+        else:
+            x = x + identity
         
-        self.skip = None
+        identity = x
         x = self.res_block6(x)
+        if self.skip6 is not None:
+            x = x + self.skip6(identity)
+        else:
+            x = x + identity
         
         # Global pooling
         x = self.global_pool(x).squeeze(-1)
@@ -155,29 +178,53 @@ class RawNet2(nn.Module):
         return self.sigmoid(x)
     
     def get_features(self, x):
+        """Extract features for analysis."""
         # Ensure input is [B, 1, T] where B is batch size and T is time samples
         x = self.conv1(x)
         
-        # Apply residual blocks
-        if self.skip is not None:
-            x = self.res_block1(x) + self.skip(x)
+        # Apply residual blocks with proper skip connections
+        identity = x
+        x = self.res_block1(x)
+        if self.skip1 is not None:
+            x = x + self.skip1(identity)
         else:
-            x = self.res_block1(x) + x
+            x = x + identity
         
-        self.skip = None
+        identity = x
         x = self.res_block2(x)
+        if self.skip2 is not None:
+            x = x + self.skip2(identity)
+        else:
+            x = x + identity
         
-        self.skip = None
-        x = self.res_block3(x) + x
+        # Repeat for remaining blocks
+        identity = x
+        x = self.res_block3(x)
+        if self.skip3 is not None:
+            x = x + self.skip3(identity)
+        else:
+            x = x + identity
         
-        self.skip = None
+        identity = x
         x = self.res_block4(x)
+        if self.skip4 is not None:
+            x = x + self.skip4(identity)
+        else:
+            x = x + identity
         
-        self.skip = None
-        x = self.res_block5(x) + x
+        identity = x
+        x = self.res_block5(x)
+        if self.skip5 is not None:
+            x = x + self.skip5(identity)
+        else:
+            x = x + identity
         
-        self.skip = None
+        identity = x
         x = self.res_block6(x)
+        if self.skip6 is not None:
+            x = x + self.skip6(identity)
+        else:
+            x = x + identity
         
         # Global pooling
         x = self.global_pool(x).squeeze(-1)
@@ -250,23 +297,32 @@ def get_audio_model(model_type=None):
     
     if model_type == "wav2vec2":
         model = Wav2Vec2Model()
-        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "wav2vec2_deepfake.pt")  # Changed to .pt
+        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "wav2vec2_deepfake.pt")
     elif model_type == "rawnet2":
         model = RawNet2()
-        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "rawnet2_deepfake.pth") 
+        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "rawnet2_deepfake.pt")  # Standardized to .pt
     elif model_type == "melspec":
         model = MelSpecResNet()
-        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "melspec_deepfake.onnx")  # Changed to .onnx
+        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "melspec_deepfake.pt")  # Standardized to .pt
     else:
         raise ValueError(f"Unsupported audio model type: {model_type}")
     
-    # Load weights if available
+    # Improved error handling for weights
     if os.path.exists(weights_path):
-        logger.info(f"Loading weights from {weights_path}")
-        state_dict = torch.load(weights_path, map_location=device)
-        model.load_state_dict(state_dict)
+        try:
+            logger.info(f"Loading weights from {weights_path}")
+            state_dict = torch.load(weights_path, map_location=device)
+            model.load_state_dict(state_dict)
+            logger.info(f"Successfully loaded weights for {model_type} model")
+        except Exception as e:
+            logger.error(f"Failed to load weights for {model_type} model: {str(e)}")
+            raise RuntimeError(f"Error loading model weights for {model_type}: {str(e)}")
     else:
-        logger.warning(f"Weights file not found at {weights_path}, using model with default initialization")
+        if settings.ENVIRONMENT == "production":
+            raise FileNotFoundError(f"Model weights file not found at {weights_path}")
+        else:
+            logger.warning(f"Weights file not found at {weights_path}, using model with default initialization")
+            logger.warning("This will likely result in poor detection performance")
     
     model = model.to(device)
     model.eval()

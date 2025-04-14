@@ -212,76 +212,32 @@ def get_image_model(model_type=None):
     
     if model_type == "xception":
         model = XceptionNet()
-        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "xception_deepfake.pth")
+        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "xception_deepfake.pt")  # Standardized to .pt
     elif model_type == "efficientnet":
         model = EfficientNetModel(variant='b4')
-        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "efficientnet_deepfake.h5")  # Changed to .h5
+        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "efficientnet_deepfake.pt")  # Standardized to .pt
     elif model_type == "mesonet":
         model = MesoNet()
-        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "mesonet_deepfake.h5")  # Changed to .h5
+        weights_path = os.path.join(settings.MODEL_WEIGHTS_DIR, "mesonet_deepfake.pt")  # Standardized to .pt
     else:
         raise ValueError(f"Unsupported image model type: {model_type}")
     
-    # Load weights if available
+    # Improved error handling for weights
     if os.path.exists(weights_path):
-        logger.info(f"Loading weights from {weights_path}")
-        if weights_path.endswith('.h5'):
-            # For TensorFlow models, we need a different loading approach
-            try:
-                import tensorflow as tf
-                import numpy as np
-                
-                # Load the h5 file
-                tf_model = tf.keras.models.load_model(weights_path)
-                
-                # Extract weights and convert to PyTorch format
-                # This is a simplified version - you may need to map specific layers
-                for i, layer in enumerate(model.modules()):
-                    if hasattr(layer, 'weight'):
-                        # Get corresponding TF layer weights
-                        if i < len(tf_model.layers):
-                            tf_weights = tf_model.layers[i].get_weights()
-                            if len(tf_weights) > 0:
-                                # Convert and assign weights
-                                layer.weight.data = torch.from_numpy(tf_weights[0].transpose())
-                                if hasattr(layer, 'bias') and layer.bias is not None and len(tf_weights) > 1:
-                                    layer.bias.data = torch.from_numpy(tf_weights[1])
-            except ImportError:
-                logger.error("TensorFlow not installed, cannot load .h5 weights")
-                logger.warning("Using model with default initialization")
-            except Exception as e:
-                logger.error(f"Error loading .h5 weights: {str(e)}")
-                logger.warning("Using model with default initialization")
-        elif weights_path.endswith('.onnx'):
-            try:
-                import onnx
-                import onnx2pytorch
-                
-                # Load ONNX model
-                onnx_model = onnx.load(weights_path)
-                
-                # Convert to PyTorch
-                pytorch_model = onnx2pytorch.ConvertModel(onnx_model)
-                
-                # Map the converted model to our model architecture
-                # This requires careful mapping of layers
-                model = pytorch_model
-            except ImportError:
-                logger.error("onnx or onnx2pytorch not installed, cannot load .onnx weights")
-                logger.warning("Using model with default initialization")
-            except Exception as e:
-                logger.error(f"Error loading .onnx weights: {str(e)}")
-                logger.warning("Using model with default initialization")
-        else:
-            # Standard PyTorch loading for .pth, .pt, and .pyth files
-            try:
-                state_dict = torch.load(weights_path, map_location=device)
-                model.load_state_dict(state_dict)
-            except Exception as e:
-                logger.error(f"Error loading weights: {str(e)}")
-                logger.warning("Using model with default initialization")
+        try:
+            logger.info(f"Loading weights from {weights_path}")
+            state_dict = torch.load(weights_path, map_location=device)
+            model.load_state_dict(state_dict)
+            logger.info(f"Successfully loaded weights for {model_type} model")
+        except Exception as e:
+            logger.error(f"Failed to load weights for {model_type} model: {str(e)}")
+            raise RuntimeError(f"Error loading model weights for {model_type}: {str(e)}")
     else:
-        logger.warning(f"Weights file not found at {weights_path}, using model with default initialization")
+        if settings.ENVIRONMENT == "production":
+            raise FileNotFoundError(f"Model weights file not found at {weights_path}")
+        else:
+            logger.warning(f"Weights file not found at {weights_path}, using model with default initialization")
+            logger.warning("This will likely result in poor detection performance")
     
     model = model.to(device)
     model.eval()
