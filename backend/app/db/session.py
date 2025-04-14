@@ -8,12 +8,18 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Configure connect_args based on database type
+connect_args = {}
+if settings.DATABASE_TYPE == "postgresql":
+    connect_args = {"options": "-c timezone=utc"}  # Set timezone to UTC for PostgreSQL
+# SQLite doesn't need special connect_args
+
 # Create database engine with connection pooling
 engine = create_engine(
     settings.SQLALCHEMY_DATABASE_URI,
     pool_pre_ping=True,  # Check connection before using it
     pool_recycle=3600,   # Recycle connections every hour
-    connect_args={"options": "-c timezone=utc"}  # Set timezone to UTC
+    connect_args=connect_args
 )
 
 # Create session factory

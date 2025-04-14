@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any, Union
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 import uuid
 
@@ -9,13 +9,15 @@ class DetectionRequest(BaseModel):
     detailed_analysis: bool = Field(False, description="Whether to perform detailed analysis")
     confidence_threshold: Optional[float] = Field(None, description="Confidence threshold for detection")
     
-    @validator('media_type')
+    @field_validator('media_type')
+    @classmethod
     def validate_media_type(cls, v):
         if v not in ['auto', 'image', 'audio', 'video']:
             raise ValueError('media_type must be one of: auto, image, audio, video')
         return v
     
-    @validator('confidence_threshold')
+    @field_validator('confidence_threshold')
+    @classmethod
     def validate_confidence_threshold(cls, v):
         if v is not None and (v < 0 or v > 1):
             raise ValueError('confidence_threshold must be between 0 and 1')
@@ -43,4 +45,4 @@ class DetectionResult(BaseModel):
     visualizations: Optional[Dict[str, str]] = Field(None, description="Paths to visualization files")
     
     class Config:
-        orm_mode = True
+        from_attributes = True

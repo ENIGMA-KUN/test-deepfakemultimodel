@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, Float, DateTime, JSON, Boolean, ForeignKe
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
-
+from app.core.config import settings
 from app.db.session import Base
 
 
@@ -16,7 +16,16 @@ class DetectionResult(Base):
     """
     __tablename__ = "detection_results"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Use different column types based on database type
+    if settings.DATABASE_TYPE == "postgresql":
+        id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+        detection_details = Column(JSONB, nullable=True, comment="Detailed detection results as JSON")
+        models_used = Column(JSONB, nullable=True, comment="Information about which models were used")
+    else:  # SQLite
+        id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+        detection_details = Column(JSON, nullable=True, comment="Detailed detection results as JSON")
+        models_used = Column(JSON, nullable=True, comment="Information about which models were used")
+        
     file_hash = Column(String(64), unique=True, index=True, nullable=False, 
                       comment="SHA-256 hash of the file")
     file_path = Column(String(255), nullable=False,
@@ -33,14 +42,6 @@ class DetectionResult(Base):
                     comment="Whether the media is detected as fake")
     confidence_score = Column(Float, nullable=False,
                              comment="Confidence score of the detection (0-1)")
-    
-    # Using JSONB for better performance with complex JSON querying
-    detection_details = Column(JSONB, nullable=True,
-                              comment="Detailed detection results as JSON")
-    
-    # Models used
-    models_used = Column(JSONB, nullable=True,
-                        comment="Information about which models were used")
     
     # Visualization data
     heatmap_path = Column(String(255), nullable=True,
@@ -61,7 +62,12 @@ class User(Base):
     """
     __tablename__ = "users"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Use different column types based on database type
+    if settings.DATABASE_TYPE == "postgresql":
+        id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    else:  # SQLite
+        id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+        
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
     hashed_password = Column(String(100), nullable=False)

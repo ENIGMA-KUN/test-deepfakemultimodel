@@ -1,108 +1,86 @@
-// Base API configuration
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+import axios, { AxiosRequestConfig } from 'axios';
 
-console.log('Using API URL:', API_URL); // For debugging
+// Base API configuration
+const api = axios.create({
+  baseURL: 'http://localhost:8000/api/v1',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: false
+});
+
+interface ApiRequestOptions {
+  method?: string;
+  body?: any;
+  headers?: Record<string, string>;
+}
 
 // Generic HTTP request handler
 export async function apiRequest<T = any>(
     endpoint: string,
-    options: RequestInit = {}
+    options: ApiRequestOptions = {}
 ): Promise<T> {
-    const headers = {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-    };
-
-    const config = {
-        ...options,
-        headers,
-    };
-
-    const url = `${API_URL}${endpoint}`;
-    console.log('Requesting:', url); // For debugging
-    
     try {
-        const response = await fetch(url, config);
-
-        if (!response.ok) {
-            // Handle different error status codes
-            if (response.status === 404) {
-                throw new Error('Resource not found');
+        // Create request config
+        const requestConfig: AxiosRequestConfig = {
+            url: endpoint,
+            method: options.method || 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(options.headers || {}),
             }
+        };
 
-            if (response.status === 401) {
-                throw new Error('Unauthorized access');
-            }
-
-            if (response.status === 429) {
-                throw new Error('Too many requests, please try again later');
-            }
-
-            // Try to get error details from response
-            try {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || `API error: ${response.status}`);
-            } catch (e) {
-                throw new Error(`API error: ${response.status}`);
-            }
+        // Add data if present
+        if (options.body) {
+            requestConfig.data = options.body;
         }
 
-        // Return JSON response, or empty object if no content
-        if (response.status !== 204) {
-            return await response.json();
-        }
+        console.log('Making API request:', {
+            endpoint,
+            method: requestConfig.method,
+            data: requestConfig.data
+        });
+        
+        const response = await api.request(requestConfig);
 
-        return {} as T;
+        console.log('API response:', response.data);
+        return response.data;
     } catch (error) {
-        console.error('API request failed:', error);
+        console.error('API request failed:', {
+            endpoint,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            details: axios.isAxiosError(error) ? error.response?.data : undefined
+        });
         throw error;
     }
 }
 
 // Upload file with form data
-export async function uploadFileRequest<T = any>(
-    endpoint: string,
-    file: File,
-    data?: Record<string, any>,
-    options: RequestInit = {}
-): Promise<T> {
+export const uploadFile = async (file: File) => {
+  try {
     const formData = new FormData();
-    
-    // Debugging - log what we're uploading
-    console.log('Uploading file:', file.name, file.type, file.size);
-    
-    // Ensure the file is properly appended with the correct field name
     formData.append('file', file);
-    
-    // Add media_type directly for backend compatibility
-    if (data && data.media_type) {
-        formData.append('media_type', data.media_type);
-    }
-    
-    // Add detailed_analysis directly for backend compatibility
-    if (data && data.hasOwnProperty('detailed_analysis')) {
-        formData.append('detailed_analysis', data.detailed_analysis.toString());
-    }
-    
-    // Add confidence_threshold directly for backend compatibility
-    if (data && data.hasOwnProperty('confidence_threshold')) {
-        formData.append('confidence_threshold', data.confidence_threshold.toString());
-    }
-    
-    // Also add the full detection_params as JSON for React frontend
-    if (data) {
-        formData.append('detection_params', JSON.stringify(data));
-    }
 
-    const config = {
-        ...options,
-        method: 'POST',
-        body: formData,
-        // Don't set Content-Type header, let the browser set it with boundary
-        headers: {
-            ...(options.headers || {}),
-        },
-    };
+    console.log('Uploading file:', {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    });
 
-    return apiRequest<T>(endpoint, config);
-}
+    const response = await api.post('/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    console.log('Upload response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Upload error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      details: axios.isAxiosError(error) ? error.response?.data : undefined
+    });
+    throw error;
+  }
+};

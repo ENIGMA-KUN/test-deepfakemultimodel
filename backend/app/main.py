@@ -23,14 +23,28 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Set up CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# DEVELOPMENT ONLY: Use more permissive CORS settings
+if settings.ENVIRONMENT == "development":
+    # Development CORS - allow all origins with proper CORS setup
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Allow all origins in development
+        allow_credentials=False,  # Must be False when using allow_origins=["*"]
+        allow_methods=["*"],  # Allow all methods
+        allow_headers=["*"],  # Allow all headers
+        expose_headers=["*"]  # Expose all headers
+    )
+    logger.warning("Development mode: Using permissive CORS settings for debugging")
+else:
+    # Production CORS with specific origins
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
+        allow_headers=["*"],
+        expose_headers=["Content-Length", "Content-Type"]
+    )
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)

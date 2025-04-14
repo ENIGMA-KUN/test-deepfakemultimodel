@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
-from pydantic import BaseSettings, Field, validator
+from pydantic import Field
+from pydantic_settings import BaseSettings
+from pydantic.v1 import validator  # Use v1 validator for backward compatibility
 from typing import List, Optional, Union, Dict, Any
 
 # Load environment variables from .env file
@@ -18,7 +20,7 @@ class Settings(BaseSettings):
     
     # CORS settings
     BACKEND_CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"]
+        default=["http://localhost:3000", "http://localhost:8000", "http://localhost:3001", "http://localhost:3002"]
     )
     
     # Database settings

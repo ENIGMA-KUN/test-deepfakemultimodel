@@ -58,17 +58,14 @@ export const useUpload = () => {
     const formData = new FormData();
     formData.append('file', file);
     
-    // Add detection parameters
-    const detectionParams = {
-      media_type: options.mediaType,
-      detailed_analysis: options.detailedAnalysis,
-      confidence_threshold: options.confidenceThreshold,
-    };
-    formData.append('detection_params', JSON.stringify(detectionParams));
+    // Append individual detection parameter fields rather than a JSON string
+    formData.append('media_type', options.mediaType);
+    formData.append('detailed_analysis', String(options.detailedAnalysis));
+    formData.append('confidence_threshold', String(options.confidenceThreshold));
 
     try {
       // Upload file with progress tracking
-      const response = await axios.post('/api/v1/upload/upload', formData, {
+      const response = await axios.post('/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

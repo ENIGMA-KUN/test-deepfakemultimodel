@@ -5,9 +5,39 @@ from typing import List, Optional
 from app.db.session import get_db
 from app.db.models import DetectionResult
 from app.schemas.detection import DetectionRequest, DetectionResponse, DetectionResult as DetectionResultSchema
+from app.services.detection_service import DetectionService
 
 
 router = APIRouter()
+
+
+@router.post("/start", response_model=DetectionResponse)
+async def start_detection(
+    request: DetectionRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Start a detection task."""
+    try:
+        # Start the detection task
+        task = DetectionService.run_detection(
+            file_path=request.file_id,
+            file_hash=request.file_id,  # Using file_id as hash since that's what we have
+            media_type=request.media_type,
+            detailed_analysis=request.detailed_analysis,
+            confidence_threshold=request.confidence_threshold or 0.5,
+            db=db
+        )
+        
+        # Return task information
+        return DetectionResponse(
+            task_id=task.get("id"),
+            status="processing",
+            media_type=request.media_type,
+            estimated_time=5  # Default estimate
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/status/{task_id}", response_model=dict)
